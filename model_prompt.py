@@ -62,7 +62,7 @@ with open("prompts.csv", "r", encoding="utf-8") as f:
 # Generate images sequentially
 for filename, prompt in prompts_to_generate:
     filepath = os.path.join(IMG_DIR, filename)
-    print(f"Generating {filepath}...")
+    print(f"Generating {filepath}: {prompt}")
     
     # 2. Generate Image
     image = pipe(
