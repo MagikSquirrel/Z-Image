@@ -34,7 +34,7 @@ pipe.to("cuda")
 img_dir = Path(IMG_DIR)
 img_dir.mkdir(exist_ok=True)
 
-# Load prompts from CSV file (split on first comma)
+# Load prompts from CSV file (split on first two commas)
 prompts_to_generate = []
 with open("prompts.csv", "r", encoding="utf-8") as f:
     for line in f:
@@ -42,13 +42,17 @@ with open("prompts.csv", "r", encoding="utf-8") as f:
         if not line:
             continue
         
-        # Split on first comma
-        comma_pos = line.find(",")
-        if comma_pos == -1:
+        # Split on first two commas
+        comma_pos1 = line.find(",")
+        if comma_pos1 == -1:
+            continue
+        comma_pos2 = line.find(",", comma_pos1 + 1)
+        if comma_pos2 == -1:
             continue
         
-        filename = line[:comma_pos].strip()
-        prompt = line[comma_pos + 1:].strip()
+        filename = line[:comma_pos1].strip()
+        force = line[comma_pos1 + 1:comma_pos2].strip()
+        prompt = line[comma_pos2 + 1:].strip()
         
         # Skip commented out rows
         if filename.startswith("#"):
@@ -56,13 +60,13 @@ with open("prompts.csv", "r", encoding="utf-8") as f:
         
         # Check if output file already exists
         filepath = os.path.join(IMG_DIR, filename + FILE_EXT)
-        if os.path.exists(filepath):
+        if os.path.exists(filepath) and force != "t":
             continue
 
-        prompts_to_generate.append((filename, filepath, prompt))
+        prompts_to_generate.append((filename, filepath, prompt, force))
 
 # Generate images sequentially
-for filename, filepath, prompt in prompts_to_generate:
+for filename, filepath, prompt, force in prompts_to_generate:
     print(f"Generating {filepath}: {prompt}")
     
     # 2. Generate Image
