@@ -1,6 +1,5 @@
 import torch
 import os
-import csv
 from pathlib import Path
 from diffusers import ZImagePipeline
 
@@ -33,31 +32,47 @@ IMG_DIR = "img"
 img_dir = Path(IMG_DIR)
 img_dir.mkdir(exist_ok=True)
 
-# Load prompts from CSV file
+# Load prompts from CSV file (split on first comma)
 prompts_to_generate = []
 with open("prompts.csv", "r", encoding="utf-8") as f:
-    reader = csv.reader(f)
-    for row in reader:
-        if len(row) >= 2:
-            prompts_to_generate.append((row[0], row[1]))
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Split on first comma
+        comma_pos = line.find(",")
+        if comma_pos == -1:
+            continue
+        
+        filename = line[:comma_pos].strip()
+        prompt = line[comma_pos + 1:].strip()
+        
+        # Skip commented out rows
+        if filename.startswith("#"):
+            continue
+        
+        # Check if output file already exists
+        filepath = os.path.join(IMG_DIR, filename)
+        if os.path.exists(filepath):
+            continue
 
-# Generate images sequentially if they don't exist
+        prompts_to_generate.append((filename, prompt))
+
+# Generate images sequentially
 for filename, prompt in prompts_to_generate:
     filepath = os.path.join(IMG_DIR, filename)
-    if not os.path.exists(filepath):
-        print(f"Generating {filepath}...")
-        
-        # 2. Generate Image
-        image = pipe(
-            prompt=prompt,
-            height=512,
-            width=512,
-            num_inference_steps=9,  # This actually results in 8 DiT forwards
-            guidance_scale=0.0,     # Guidance should be 0 for the Turbo models
-            generator=torch.Generator("cuda").manual_seed(42),
-        ).images[0]
+    print(f"Generating {filepath}...")
+    
+    # 2. Generate Image
+    image = pipe(
+        prompt=prompt,
+        height=512,
+        width=512,
+        num_inference_steps=3,  # This actually results in 8 DiT forwards
+        guidance_scale=0.0,     # Guidance should be 0 for the Turbo models
+        generator=torch.Generator("cuda").manual_seed(42),
+    ).images[0]
 
-        image.save(filepath)
-        print(f"Saved {filepath}")
-    else:
-        print(f"{filepath} already exists, skipping...")
+    image.save(filepath)
+    print(f"Saved {filepath}")
