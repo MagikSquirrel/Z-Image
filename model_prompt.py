@@ -3,6 +3,11 @@ import os
 from pathlib import Path
 from diffusers import ZImagePipeline
 
+# File extension constant
+FILE_EXT = ".png"
+# Output directory for generated images
+IMG_DIR = "img"
+
 # 1. Load the pipeline
 # Use bfloat16 for optimal performance on supported GPUs
 pipe = ZImagePipeline.from_pretrained(
@@ -24,9 +29,6 @@ pipe.to("cuda")
 # [Optional] CPU Offloading
 # Enable CPU offloading for memory-constrained devices.
 # pipe.enable_model_cpu_offload()
-
-# Output directory for generated images
-IMG_DIR = "img"
 
 # Create img directory if it doesn't exist
 img_dir = Path(IMG_DIR)
@@ -53,15 +55,14 @@ with open("prompts.csv", "r", encoding="utf-8") as f:
             continue
         
         # Check if output file already exists
-        filepath = os.path.join(IMG_DIR, filename)
+        filepath = os.path.join(IMG_DIR, filename + FILE_EXT)
         if os.path.exists(filepath):
             continue
 
-        prompts_to_generate.append((filename, prompt))
+        prompts_to_generate.append((filename, filepath, prompt))
 
 # Generate images sequentially
-for filename, prompt in prompts_to_generate:
-    filepath = os.path.join(IMG_DIR, filename)
+for filename, filepath, prompt in prompts_to_generate:
     print(f"Generating {filepath}: {prompt}")
     
     # 2. Generate Image
@@ -69,7 +70,7 @@ for filename, prompt in prompts_to_generate:
         prompt=prompt,
         height=512,
         width=512,
-        num_inference_steps=3,  # This actually results in 8 DiT forwards
+        num_inference_steps=9,  # This actually results in 8 DiT forwards
         guidance_scale=0.0,     # Guidance should be 0 for the Turbo models
         generator=torch.Generator("cuda").manual_seed(42),
     ).images[0]
