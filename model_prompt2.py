@@ -2,6 +2,15 @@ import torch
 import os
 from pathlib import Path
 from diffusers import ZImagePipeline
+import os
+from pathlib import Path
+import time
+
+import torch
+from utils.helpers import ensure_model_weights
+from utils.selector import select_device
+from utils import AttentionBackend, load_from_local_dir, set_attention_backend
+from zimage import generate
 
 # File extension constant
 FILE_EXT = ".png"
@@ -65,19 +74,42 @@ with open("prompts.csv", "r", encoding="utf-8") as f:
 
         prompts_to_generate.append((filename, filepath, prompt, force))
 
+# Setup model
+model_path = ensure_model_weights("ckpts/Z-Image-Turbo", verify=False)  # True to verify with md5
+dtype = torch.bfloat16
+compile = False
+height = 512
+width = 512
+num_inference_steps = 3
+guidance_scale = 0.0
+attn_backend = os.environ.get("ZIMAGE_ATTENTION", "_native_flash")
+output_dir = Path(IMG_DIR)
+output_dir.mkdir(exist_ok=True)
+device = select_device()
+
+components = load_from_local_dir(model_path, device=device, dtype=dtype, compile=compile)
+AttentionBackend.print_available_backends()
+set_attention_backend(attn_backend)
+print(f"Chosen attention backend: {attn_backend}")
+
 # Generate images sequentially
+idx=1
 for filename, filepath, prompt, force in prompts_to_generate:
+    generator = torch.Generator(device).manual_seed(42)
     print(f"Generating {filepath}: {prompt}")
     
-    # 2. Generate Image
-    image = pipe(
+    start_time = time.time()
+    images = generate(
         prompt=prompt,
-        height=512,
-        width=512,
-        num_inference_steps=9,  # This actually results in 8 DiT forwards
-        guidance_scale=0.0,     # Guidance should be 0 for the Turbo models
-        generator=torch.Generator("cuda").manual_seed(42),
-    ).images[0]
+        **components,
+        height=height,
+        width=width,
+        num_inference_steps=num_inference_steps,
+        guidance_scale=guidance_scale,
+        generator=generator,
+    )
+    elapsed = time.time() - start_time    
+    images[0].save(filepath)
 
-    image.save(filepath)
-    print(f"Saved {filepath}")
+    print(f"[{idx}] Saved {filepath} in {elapsed:.2f} seconds")
+    idx += 1
